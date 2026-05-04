@@ -413,6 +413,19 @@ class InformerEventSourceTest {
   }
 
   @Test
+  void eventFilteringUpdateHandlesNullFromUpdateMethodGracefully() {
+    // When the supplied update operation returns null (e.g. fabric8's edit() returns null
+    // because the patch target is already gone on the API server), null must propagate
+    // cleanly out of eventFilteringUpdateAndCacheResource rather than throw.
+    withRealTemporaryResourceCache();
+
+    var result =
+        informerEventSource.eventFilteringUpdateAndCacheResource(testDeployment(), r -> null);
+
+    assertThat(result).isNull();
+  }
+
+  @Test
   void filteringUpdateAndGhostCheckWithNamespaceChange() {
     var mes = mock(ManagedInformerEventSource.class);
     var mim = mock(InformerManager.class);
@@ -461,26 +474,26 @@ class InformerEventSourceTest {
   private void expectHandleEvent(int newResourceVersion, int oldResourceVersion) {
     await()
         .untilAsserted(
-            () -> {
-              verify(informerEventSource, times(1))
-                  .handleEvent(
-                      eq(ResourceAction.UPDATED),
-                      argThat(
-                          newResource -> {
-                            assertThat(newResource.getMetadata().getResourceVersion())
-                                .isEqualTo("" + newResourceVersion);
-                            return true;
-                          }),
-                      argThat(
-                          newResource -> {
-                            assertThat(newResource.getMetadata().getResourceVersion())
-                                .isEqualTo("" + oldResourceVersion);
-                            return true;
-                          }),
-                      isNull());
-            });
+            () ->
+                verify(informerEventSource, times(1))
+                    .handleEvent(
+                        eq(ResourceAction.UPDATED),
+                        argThat(
+                            newResource -> {
+                              assertThat(newResource.getMetadata().getResourceVersion())
+                                  .isEqualTo("" + newResourceVersion);
+                              return true;
+                            }),
+                        argThat(
+                            newResource -> {
+                              assertThat(newResource.getMetadata().getResourceVersion())
+                                  .isEqualTo("" + oldResourceVersion);
+                              return true;
+                            }),
+                        isNull()));
   }
 
+  @SuppressWarnings("SameParameterValue")
   private CountDownLatch sendForEventFilteringUpdate(int resourceVersion) {
     return sendForEventFilteringUpdate(testDeployment(), resourceVersion);
   }
